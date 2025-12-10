@@ -212,6 +212,10 @@ library_content_dict = {
     "harmony": "[R] Batch correction and integration (Harmony).",
     "WGCNA": "[R] Weighted gene co-expression network analysis.",
 
+    # gmk added
+    "nichenetr": "[R] Ligand–target regulatory network analysis for cell–cell communication.",
+    "multinichenetr": "[R] Extension of NicheNet for multi-sample differential analysis between conditions.",
+
     # === CLI TOOLS (subset kept) ===
     "samtools": "[CLI] BAM/CRAM/VCF utilities (alignment and variant files).",
     "bowtie2": "[CLI] Short-read aligner to reference genomes.",
