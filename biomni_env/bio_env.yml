@@ -68,3 +68,12 @@ dependencies:
     - pykalman
     - community
     - fanc
+# missing (but in env_desc.py):
+    - hyperopt
+    - tiledb
+    - tiledbsoma
+# added
+    - celltypist
+    - decoupler
+    - pydeseq2
+    - cellphonedb
