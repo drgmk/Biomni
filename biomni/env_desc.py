@@ -124,6 +124,7 @@ library_content_dict = {
     "pybedtools": "[Python] Python wrapper for BEDTools genomic interval operations.",
 
     # gmk added
+    "scirpy": "[Python] Single-cell immune receptor analysis.",
     "celltypist": "[Python] Automated cell type annotation for single-cell RNA-seq data.",
     "decoupler": "[Python] Gene regulatory network analysis, activity inference, cell annotation.",
     "pydeseq2": "[Python] Differential expression analysis using Python port of DESeq2",

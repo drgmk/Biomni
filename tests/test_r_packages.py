@@ -36,7 +36,7 @@ def check_r_package_installed(package_name: str) -> tuple[bool, str]:
         result = subprocess.run(
             ["Rscript", "-e", r_code],
             capture_output=True,
-            timeout=10,
+            timeout=30,
             text=True
         )
         

@@ -77,3 +77,4 @@ dependencies:
     - decoupler
     - pydeseq2
     - cellphonedb
+    - scirpy
