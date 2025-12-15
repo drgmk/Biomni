@@ -180,20 +180,6 @@ def trim_outliers(
     return np.logical_and(mask, extra_mask_)
 
 
-def plot_nxy(n):
-    """Return no of x, y panels for plotting approx square panels."""
-    if n < 4:
-        y = 1
-    elif n < 9:
-        y = 2
-    elif n < 16:
-        y = 3
-    else:
-        y = 4  # ok up to n=24
-    x = int(np.ceil(n / y))
-    return x, y
-
-
 def plot_gene_counts(
     adata,
     hue="sample",
@@ -233,6 +219,19 @@ def plot_gene_counts(
     vmax = (
         np.max(adata[mask].obs[colour_by]) if colour_by in adata.obs.columns else None
     )
+
+    def plot_nxy(n):
+        """Return no of x, y panels for plotting approx square panels."""
+        if n < 4:
+            y = 1
+        elif n < 9:
+            y = 2
+        elif n < 16:
+            y = 3
+        else:
+            y = 4  # ok up to n=24
+        x = int(np.ceil(n / y))
+        return x, y
 
     nx, ny = plot_nxy(len(order))
     fig, ax = plt.subplots(ny, nx, sharey=True, sharex=True, figsize=(10, 7))
@@ -301,7 +300,7 @@ def plot_gene_counts(
 min_genes = 200
 min_cells = 3
 max_mt_pct = 10.0
-max_top1_pct = 30.0
+max_top1_pct = 20.0
 pct_outlier_cutoff = 99.0
 sample_col = "sample_id"  # or batch column if applicable
 
@@ -324,15 +323,26 @@ mask = scfunc.trim_outliers(
 fig = plot_gene_counts(
     rna, hue=sample_col, mask=mask, show_masked=True
 )
-fig.savefig(str(out_path / "gene_counts_per_sample.pdf"))
+fig.savefig(str(out_path / "gene_counts_per_sample.png"), dpi=150)
 
-# save and apply mask
+# save and apply masks and thresholds
+rna.uns["meta_qc_thresholds"] = {
+    "min_genes_per_cell": min_genes,
+    "min_cells_per_gene": min_cells,
+    "max_mt_pct": max_mt_pct,
+    "max_top1_pct": max_top1_pct,
+    "pct_outlier_cutoff": pct_outlier_cutoff,
+}
 rna.uns["meta_qc_mask_cells"] = mask
 rna.uns["meta_qc_mask_genes"] = mask_genes
 rna = rna[mask, mask_genes].copy()```
 ```
 
 ### Step 2: Doublet Detection
+
+- Choose appropriate doublet detection tool based on computational resources.
+  - If rapid-singlecell is available and GPU/CUDA is accessible, use `rapids_singlecell.pp.scrublet`.
+  - Otherwise, use `scanpy.pp.scrublet`.
 
 ```python
 # Scanpy example
@@ -352,9 +362,14 @@ rsc.tl.scrublet(adata, batch_key='batch')  # if multiple batches
 
 ### Do's:
 1. **Check that thresholds are reasonable** - Avoid over-filtering
+2. **Visualize QC metrics** - Use plots to guide threshold selection
+3. **Apply doublet detection to filtered data** - Reduces false positives
+4. **Keep results for downstream analysis** - Save dataset after filtering and doublet detection
+5. **Document thresholds used** - Save masks and thresholds in `adata.uns` for reproducibility
 
 ### Don'ts:
 1. **Don't be too aggressive** - A small number of low-quality cells is okay
+2. **Don't forget to save the results** - Always save the filtered dataset and metadata for downstream analysis
 
 ## Common Pitfalls
 
@@ -377,15 +392,17 @@ rsc.tl.scrublet(adata, batch_key='batch')  # if multiple batches
 
 ## Quality Control Checklist
 
-- [ ] Check dataset for per-cell metadata, e.g. batch/sample IDs
+- [ ] Check dataset for per-cell metadata, e.g. batch/sample IDs in `adata.obs`
 - [ ] Set initial filtering thresholds based on dataset characteristics
 - [ ] Apply trimming function to remove outliers in n_genes_by_counts vs. total_counts space
 - [ ] Apply masks for mitochondrial percentage, fraction of counts from most expressed gene, minimum genes per cell, minimum cells per gene
 - [ ] Apply filtering per sample/batch if applicable
 - [ ] Alter thresholds and repeat if necessary to retain sufficient high-quality cells
-- [ ] Save threshold values in `adata.uns` for documentation
-- [ ] Detect doublets for later exclusion using appropriate tool
-- [ ] Visualize QC metrics before and after filtering
+- [ ] Detect doublets in filtered data for later exclusion using appropriate tool
+- [ ] Save threshold values and masks in `adata.uns` for documentation
+- [ ] Check that doublet results are saved in `adata.obs`
+- [ ] Save filtered dataset for downstream analysis
+- [ ] Visualize QC metrics before and after filtering, both 1d distributions with thresholds and 2d plots
 
 ## Resources
 
