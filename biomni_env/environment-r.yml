@@ -1,0 +1,100 @@
+#
+# these replace the R dependencies install_r_packages.R
+# faster this way with binaries
+#
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  # R base
+  - r-base=4.3.1
+  - r-essentials
+
+  # build + system libs
+  - git
+  - make
+  - cmake
+  - pkg-config
+  - libxml2
+  - libcurl
+  - openssl
+  - geos
+  # Linux compilers (drop/adjust on macOS)
+  - gcc_linux-64
+  - gxx_linux-64
+  - gfortran_linux-64
+
+  # R tooling
+  - r-devtools
+  - r-remotes
+
+  # tidyverse-ish core
+  - r-dplyr
+  - r-tidyr
+  - r-readr
+  - r-tibble
+  - r-purrr
+  - r-ggplot2
+  - r-stringr
+  - r-magrittr
+  - r-matrix
+  - r-rlang
+  - r-rcpp
+  - r-rcppeigen
+
+  # Seurat + hdf5
+  - r-seurat
+  - r-seuratobject
+  - r-future
+  - r-future.apply
+  - r-pbapply
+  - r-hdf5r
+
+  # Bioconductor core for MultiNicheNet
+  - bioconductor-singlecellexperiment
+  - bioconductor-summarizedexperiment
+  - bioconductor-muscat
+  - bioconductor-zellkonverter
+  - bioconductor-basilisk
+  - bioconductor-basilisk.utils
+  - bioconductor-delayedarray
+  - bioconductor-rhdf5
+  - bioconductor-sva
+  - bioconductor-metapod
+  - bioconductor-bluster
+  - bioconductor-scran
+
+  - bioconductor-deseq2
+  - bioconductor-clusterprofiler
+  - bioconductor-edger
+  - bioconductor-limma
+  - r-wgcna
+  - r-harmony
+
+  # heavier stats / graph stuff that’s slow to compile from source
+  - r-factominer
+  - r-hmisc
+  - r-emmeans
+  - r-tidygraph
+  - r-ggraph
+  - r-graphlayouts
+  - r-visnetwork
+  - r-diagrammer
+  - r-dicekriging
+  - r-emoa
+  - r-factoextra
+  - r-upsetr
+  - r-envstats
+  - r-locfdr
+  - r-dt
+  - r-dendextend
+
+  # handy
+  - pandoc
+
+  # extras that failed while installing nichenetr
+  - r-systemfonts
+  - r-gdtools
+  - r-ggiraph
+  - r-shadowtext
