@@ -60,7 +60,6 @@ Detect (and later remove) doublets to prevent misleading annotations.
     - minimum cells per gene
   - Apply filtering per sample/batch if applicable.
 - Alter thresholds and repeat if necessary to retain sufficient high-quality cells.
-- Save threshold values in `adata.uns` for documentation.
 
 Functions to perform these steps are in the `scrna.functions` module. Docstrings and usage are below:
 
@@ -141,7 +140,7 @@ def plot_gene_counts(
 ```
 
 ```python
-# use scrna.functions
+# use scrna.functions to filter low-quality cells
 import scrna.functions as scfunc
 import scanpy as scanpy
 
@@ -168,6 +167,13 @@ mask = scfunc.trim_outliers(
     extra_mask_boolean=mask_cells,
     pct=pct_outlier_cutoff,
 )
+```
+- Visualise basic QC metrics, e.g. violin plots.
+- Visualize gene counts per sample using `plot_gene_counts` to assess filtering impact.
+
+```python
+# visualize basic QC metrics
+import scanpy as sc
 
 # plot gene counts per sample
 fig = plot_gene_counts(
@@ -175,6 +181,18 @@ fig = plot_gene_counts(
 )
 fig.savefig(str(out_path / "gene_counts_per_sample.png"), dpi=150)
 
+sc.pl.violin(
+    rna,
+    ["n_genes_by_counts", "total_counts", "pct_counts_mt"],
+    groupby=sample_col,
+    jitter=0.4,
+    multi_panel=True,
+)
+```
+
+- Save threshold values in `adata.uns` for documentation.
+
+```python
 # save and apply masks and thresholds
 rna.uns["meta_qc_thresholds"] = {
     "min_genes_per_cell": min_genes,
