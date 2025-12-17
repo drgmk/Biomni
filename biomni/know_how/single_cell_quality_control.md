@@ -36,16 +36,24 @@ Set initial thresholds for:
 - Minimum number of cells expressing a gene (e.g., >3)
 - Maximum mitochondrial gene percentage (e.g., <5-10%)
 - Maximum fraction of counts from the most expressed gene (e.g., <20-30%)
-Remove cells that do not meet quality thresholds. Revise thresholds if necessary.
+- Assess and revise thresholds if necessary.
+- Visualise results before and after filtering.
+- Save filtering masks and thresholds in `adata.uns` for documentation.
 
 **Tools**: scrna.functions, scanpy, rapids-singlecell
 **Best for**: All datasets
 
 ### 2. Doublet Detection
-Detect (and later remove) doublets to prevent misleading annotations.
+- Detect and remove doublets to prevent misleading annotations.
+- Visualize doublet scores and predictions to assess results.
+- Save doublet results in `adata.obs` for later exclusion.
 
 **Tools**: scanpy.pp.scrublet, rapids-singlecell.pp.scrublet
 **Best for**: All datasets
+
+### 3. Save filtered dataset
+- Apply filtering and doublet masks to the `AnnData` object.
+- Save the filtered dataset for downstream analysis.
 
 ## Recommended Workflow
 
@@ -211,6 +219,8 @@ rna = rna[mask, mask_genes].copy()```
 - Choose appropriate doublet detection tool based on computational resources.
   - If rapid-singlecell is available and GPU/CUDA is accessible, use `rapids_singlecell.pp.scrublet`.
   - Otherwise, use `scanpy.pp.scrublet`.
+  - Visualize doublet scores and predictions to assess results.
+  - Save doublet results in `adata.obs` for later exclusion.
 
 ```python
 # Scanpy example
@@ -226,6 +236,31 @@ import rapids_singlecell as rsc
 rsc.tl.scrublet(adata, batch_key='batch')  # if multiple batches
 ```
 
+```python
+# discard predicted doublets
+doublet_mask = rna.obs["predicted_doublet"] == False
+rna = rna[doublet_mask].copy()
+```
+
+```python
+# visualize doublet scores and predictions
+sc.pl.violin(
+    rna,
+    ["doublet_score", "predicted_doublet"],
+    groupby=sample_col,
+    jitter=0.4,
+    multi_panel=True,
+)
+```
+
+### Step 3: Save filtered dataset
+- Save the filtered dataset for downstream analysis.
+
+```python
+# save filtered dataset
+rna.write_h5ad(str(out_path / "rna_filtered_qc.h5ad"))
+```
+
 ## Best Practices
 
 ### Do's:
@@ -239,6 +274,7 @@ rsc.tl.scrublet(adata, batch_key='batch')  # if multiple batches
 ### Don'ts:
 1. **Don't be too aggressive** - A small number of low-quality cells is okay
 2. **Don't forget to save the results** - Always save the filtered dataset and metadata for downstream analysis
+3. **Don't save too many files** - Save a final filtered dataset rather than multiple intermediate files
 
 ## Common Pitfalls
 
