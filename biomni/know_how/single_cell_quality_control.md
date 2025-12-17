@@ -38,7 +38,7 @@ Set initial thresholds for:
 - Maximum fraction of counts from the most expressed gene (e.g., <20-30%)
 Remove cells that do not meet quality thresholds. Revise thresholds if necessary.
 
-**Tools**: scanpy, rapids-singlecell
+**Tools**: scrna.functions, scanpy, rapids-singlecell
 **Best for**: All datasets
 
 ### 2. Doublet Detection
@@ -62,14 +62,15 @@ Detect (and later remove) doublets to prevent misleading annotations.
 - Alter thresholds and repeat if necessary to retain sufficient high-quality cells.
 - Save threshold values in `adata.uns` for documentation.
 
-```python
-# useful functions for QC
-import scanpy as sc
-import numpy as np
-import scipy.stats
+Functions to perform these steps are in the `scrna.functions` module. Docstrings and usage are below:
 
+```python
+# docstrings for QC functions in scrna.functions
 def compute_qc_metrics(adata, extra_genes=[]):
     """Calculate QC metrics for RNA data.
+
+    Annotated data matrix `adata` is updated in-place with percent counts for mitochondrial, ribosomal,
+    and MALAT genes, as well as any extra gene prefixes provided.
 
     Parameters
     ----------
@@ -78,38 +79,6 @@ def compute_qc_metrics(adata, extra_genes=[]):
     extra_genes : list, optional
         List of extra gene prefixes to calculate percent counts for.
     """
-
-    pct_counts = {
-        "mt": ["MT-"],
-        "ribosomal": ["RPL", "RPS"],
-        "malat": ["MALAT"],
-    }
-    for g in extra_genes:
-        pct_counts[g] = [g]
-
-    # convert everthing to lower case for matching
-    for k, v in pct_counts.items():
-        pct_counts[k] = [s.lower() for s in v]
-
-    for k in pct_counts.keys():
-        adata.var[k] = adata.var_names.str.lower().str.startswith(pct_counts[k][0])
-        if len(pct_counts[k]) > 1:
-            for s in pct_counts[k][1:]:
-                adata.var[k] = np.logical_or(
-                    adata.var[k], adata.var_names.str.lower().str.startswith(s)
-                )
-
-        sc.pp.calculate_qc_metrics(
-            adata, qc_vars=[k], percent_top=None, log1p=False, inplace=True
-        )
-
-    # also calculate percent in top gene
-    sc.pp.calculate_qc_metrics(
-        adata, qc_vars=(), percent_top=[1], log1p=False, inplace=True
-    )
-
-    # add meta to adata.uns
-    adata.uns["pct_counts"] = pct_counts
 
 
 def trim_outliers(
@@ -140,46 +109,6 @@ def trim_outliers(
         Percentile to use for trimming outliers, default is 100 (no trimming).
     """
 
-    mask = np.ones(adata.shape[0], dtype=bool)
-
-    if groupby is not None:
-        for g in np.unique(adata.obs[groupby]):
-            mask_g = adata.obs[groupby] == g
-            mask[mask_g] = trim_outliers(
-                adata[mask_g, :], x=x, y=y, extra_mask=extra_mask, pct=pct
-            )
-
-        adata.uns["trim_outliers_mask"] = mask
-        return mask
-
-    if extra_mask is None:
-        extra_mask_ = np.ones(adata.shape[0], dtype=bool)
-    else:
-        extra_mask_ = np.ones(adata.shape[0], dtype=bool)
-        for k, v in extra_mask.items():
-            if v[1] == "max":
-                extra_mask_ = np.logical_and(extra_mask_, adata.obs[k] < v[0])
-            elif v[1] == "min":
-                extra_mask_ = np.logical_and(extra_mask_, adata.obs[k] > v[0])
-            else:
-                raise ValueError(
-                    f'unknown key {k} in extra_mask, must contain "min" or "max"'
-                )
-
-    if extra_mask_boolean is not None:
-        extra_mask_ = np.logical_and(extra_mask_, extra_mask_boolean)
-
-    x_ = np.log10(adata.obs[x])
-    y_ = np.log10(adata.obs[y])
-    fit = scipy.stats.linregress(x_[extra_mask_], y_[extra_mask_])
-    y_fit = fit.intercept + fit.slope * x_
-    resid = y_ - y_fit
-    thresh = np.percentile(resid, [100 - pct, pct])
-    mask = np.logical_and(resid > thresh[0], resid < thresh[1])
-    adata.uns["trim_outliers_mask"] = mask
-    return np.logical_and(mask, extra_mask_)
-
-
 def plot_gene_counts(
     adata,
     hue="sample",
@@ -209,94 +138,15 @@ def plot_gene_counts(
     size_by : str, optional
         Column name in `adata.obs` to use for the size of the points.
     """
-
-    if mask is None:
-        mask = np.ones(adata.shape[0], dtype=bool)
-
-    if order is None:
-        order = adata.obs[hue].unique()
-
-    vmax = (
-        np.max(adata[mask].obs[colour_by]) if colour_by in adata.obs.columns else None
-    )
-
-    def plot_nxy(n):
-        """Return no of x, y panels for plotting approx square panels."""
-        if n < 4:
-            y = 1
-        elif n < 9:
-            y = 2
-        elif n < 16:
-            y = 3
-        else:
-            y = 4  # ok up to n=24
-        x = int(np.ceil(n / y))
-        return x, y
-
-    nx, ny = plot_nxy(len(order))
-    fig, ax = plt.subplots(ny, nx, sharey=True, sharex=True, figsize=(10, 7))
-
-    # check on size_by, and rescale between 1 and 5
-    sizes = adata.obs[size_by] / 4
-    if sizes.min() == sizes.max():
-        sizes = 2 * np.ones(adata.shape[0])
-    else:
-        sizes = 1 + 4 * (sizes - sizes.min()) / (sizes.max() - sizes.min())
-
-    for i, s in enumerate(order):
-        a = ax.flatten()[i]
-        ok = (adata.obs[hue] == s) & mask
-        tmp = adata[ok, :]
-        _ = a.scatter(
-            tmp.obs["total_counts"],
-            tmp.obs["n_genes_by_counts"],
-            s=sizes[ok],
-            c=tmp.obs[colour_by],
-            vmin=0,
-            vmax=vmax,
-            cmap="viridis",
-        )
-        if show_masked:
-            ok = (adata.obs[hue] == s) & np.invert(mask)
-            tmp = adata[ok, :]
-            a.scatter(
-                tmp.obs["total_counts"],
-                tmp.obs["n_genes_by_counts"],
-                s=sizes[ok],
-                c="lightgrey",
-                alpha=0.5,
-                zorder=-1,
-            )
-            #   s=tmp.obs[size_by]/4, c=tmp.obs[colour_by], alpha=0.2,
-            #   vmin=0, vmax=vmax, cmap='Grays', zorder=-1)
-
-        a.set_title(s)
-
-    [a.set_visible(False) for a in ax.flatten()[i + 1 :]]
-    if ny == 1:
-        ax = ax[np.newaxis, :]
-    ax[ny - 1, 0].set_ylabel("n_genes_by_counts")
-    ax[ny - 1, 0].set_xlabel("total_counts")
-    ax[0, 0].set_xscale("log")
-    ax[0, 0].set_yscale("log")
-
-    # Place colorbar to the right of all axes, spanning full height
-    # divider = make_axes_locatable(ax.flatten()[-1])
-    # cax = divider.append_axes("right", size="5%", pad=0.05)
-    fig.tight_layout()
-    fig.subplots_adjust(right=0.88)
-    cbar_ax = fig.add_axes((0.9, 0.15, 0.02, 0.7))
-    cb = fig.colorbar(_, cax=cbar_ax, aspect=30)
-    cb.set_label(colour_by)
-    # turn grid on for all axes
-    for a in ax.flatten():
-        a.grid(True, which="both", linestyle="-", linewidth=0.5, alpha=0.5)
-        a.set_axisbelow(True)
-    return fig
 ```
 
 ```python
-# use the above functions
+# use scrna.functions
+import scrna.functions as scfunc
+import scanpy as scanpy
+
+# assume rna is an AnnData object with raw counts loaded
+# and per-cell metadata including sample/batch IDs in rna.obs
 min_genes = 200
 min_cells = 3
 max_mt_pct = 10.0
@@ -361,11 +211,12 @@ rsc.tl.scrublet(adata, batch_key='batch')  # if multiple batches
 ## Best Practices
 
 ### Do's:
-1. **Check that thresholds are reasonable** - Avoid over-filtering
-2. **Visualize QC metrics** - Use plots to guide threshold selection
-3. **Apply doublet detection to filtered data** - Reduces false positives
-4. **Keep results for downstream analysis** - Save dataset after filtering and doublet detection
-5. **Document thresholds used** - Save masks and thresholds in `adata.uns` for reproducibility
+1. **Use the recommended workflow for QC** - Follow the steps outlined above
+2. **Check that thresholds are reasonable** - Avoid over-filtering
+3. **Visualize QC metrics** - Use plots to guide threshold selection
+4. **Apply doublet detection to filtered data** - Reduces false positives
+5. **Keep results for downstream analysis** - Save dataset after filtering and doublet detection
+6. **Document thresholds used** - Save masks and thresholds in `adata.uns` for reproducibility
 
 ### Don'ts:
 1. **Don't be too aggressive** - A small number of low-quality cells is okay
@@ -407,7 +258,8 @@ rsc.tl.scrublet(adata, batch_key='batch')  # if multiple batches
 ## Resources
 
 ### Tools:
-- **functions in this document**: see code snippets above
+- **above code snippets**: see code snippets above
+- **scrna**: https://github.com/drgmk/scrna
 - **scanpy**: https://scanpy.readthedocs.io/
 - **rapids-singlecell**: https://github.com/scverse/rapids_singlecell/
 
